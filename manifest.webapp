@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "name": "IPTV",
-  "description": "Watch free videos from around the world on KaiOS for free",
+  "name": "IPTV Tube",
+  "description": "Watch free iptv channels from around the world on KaiOS for free",
   "launch_path": "/index.html",
   "theme": "#873eff",
   "theme_color": "#873eff",
@@ -26,9 +26,9 @@
   },
   "locales": {
     "en-US": {
-      "name": "IPTV",
-      "subtitle": "Watch free videos from around the world on KaiOS for free",
-      "description": "Watch free videos from around the world on KaiOS for free"
+      "name": "IPTV Tube",
+      "subtitle": "Watch free iptv channels from around the world on KaiOS for free",
+      "description": "Watch free iptv channels from around the world on KaiOS for free"
     }
   },
   "default_locale": "en-US"

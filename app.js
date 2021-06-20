@@ -90,7 +90,6 @@ window.addEventListener("load", function() {
             video.clientHeight = 240 / this.data.ratio;
             this.data.width = video.width;
             this.data.height = video.clientHeight;
-            console.log('loadedmetadata');
             window['hls'].startLoad();
           }
           video.oncanplaythrough = (evt) => {
@@ -115,6 +114,7 @@ window.addEventListener("load", function() {
           window['hls'].destroy();
           window['hls'] = null;
           window['video'] = null;
+          displayKaiAds();
         },
         softKeyText: { left: 'Fullscreen', center: '', right: '' },
         softKeyListener: {
@@ -380,6 +380,26 @@ window.addEventListener("load", function() {
     );
   }
 
+  const helpSupportPage = new Kai({
+    name: 'helpSupportPage',
+    data: {
+      title: 'helpSupportPage'
+    },
+    templateUrl: document.location.origin + '/templates/helpnsupport.html',
+    mounted: function() {
+      this.$router.setHeaderTitle('Help & Support');
+      navigator.spatialNavigationEnabled = false;
+    },
+    unmounted: function() {},
+    methods: {},
+    softKeyText: { left: '', center: '', right: '' },
+    softKeyListener: {
+      left: function() {},
+      center: function() {},
+      right: function() {}
+    }
+  });
+
   const home = new Kai({
     name: 'home',
     data: {
@@ -402,9 +422,10 @@ window.addEventListener("load", function() {
         browseCategory(this.$router, item.name);
       },
     },
-    softKeyText: { left: 'Menu', center: 'SELECT', right: 'Exit' },
+    softKeyText: { left: 'Help', center: 'SELECT', right: 'Exit' },
     softKeyListener: {
       left: function() {
+        this.$router.push('helpSupportPage');
       },
       center: function() {
         const selected = this.data.list[this.verticalNavIndex];
@@ -448,6 +469,10 @@ window.addEventListener("load", function() {
         name: 'home',
         component: home
       },
+      'helpSupportPage': {
+        name: 'helpSupportPage',
+        component: helpSupportPage
+      },
     }
   });
 
@@ -484,7 +509,7 @@ window.addEventListener("load", function() {
       return;
     getKaiAd({
       publisher: 'ac3140f7-08d6-46d9-aa6f-d861720fba66',
-      app: 'y-tube',
+      app: 'iptv-tube',
       slot: 'kaios',
       onerror: err => console.error(err),
       onready: ad => {
@@ -496,11 +521,11 @@ window.addEventListener("load", function() {
     })
   }
 
-  // displayKaiAds();
+  displayKaiAds();
 
   document.addEventListener('visibilitychange', function(ev) {
     if (document.visibilityState === 'visible') {
-      // displayKaiAds();
+      displayKaiAds();
     }
   });
 

@@ -18,15 +18,11 @@
       height: 100%;
       background-color: #000000;
     }
-    .fullscreen {
-      transform: rotate(90deg);
-      position: relative !important;
-      max-width: 264px !important;
-      width: 264px !important;
-      height: 292px !important;
-    }
-    .fullscreen-r {
-      height:294px!important;
+    /* KaiOS landscape devices (320x240) */
+    @media screen and (orientation: landscape) {
+      .kai-container {
+        height: 80%;
+      }
     }
   </style>
   <div class="kai-container">
