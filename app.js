@@ -81,6 +81,7 @@ window.addEventListener("load", function() {
         },
         templateUrl: document.location.origin + '/templates/player.html',
         mounted: function() {
+          console.log(meta.url);
           this.$router.setHeaderTitle(meta.name);
           this.$router.showLoading(false);
           var video = document.getElementById('vplayer');
@@ -249,7 +250,7 @@ window.addEventListener("load", function() {
       }
     } else if (name === 'By Language') {
       for (var x in LANGUAGE) {
-        LINKS.push({ name: x, url: COUNTRY[x] });
+        LINKS.push({ name: x, url: LANGUAGE[x] });
       }
     }
     $router.push(
