@@ -1,4 +1,5 @@
 var xhr = function(method, url, data={}, query={}, headers={}) {
+  headers['User-Agent'] = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.77 Safari/537.36";
   return new Promise((resolve, reject) => {
     var xhttp = new XMLHttpRequest({ mozSystem: true });
     var _url = new URL(url);
@@ -65,6 +66,58 @@ function parse(a) {
   return metadata;
 }
 
+function filterLanguages(evt) {
+  var result = false
+  for (var x in evt.languages) {
+    if (evt.languages[x].name) {
+      if (evt.languages[x].name.indexOf(param) > -1) {
+        result = true;
+        break;
+      }
+    }
+  }
+  return result;
+}
+
+function filterCountries(evt) {
+  var result = false
+  for (var x in evt.countries) {
+    if (evt.countries[x].name) {
+      if (evt.countries[x].name.indexOf(param) > -1) {
+        result = true;
+        break;
+      }
+    }
+  }
+  return result;
+}
+
+function filterCategory(evt) {
+  var result = false
+  if (evt.category) {
+    if (evt.category.indexOf(param) > -1) {
+      result = true;
+    }
+  }
+  return result;
+}
+
+const downloadChannel = function(param, cb) {
+  this.param = param;
+  return xhr('GET', `${document.location.origin}/channels.json`)
+  .then(res => {
+    function removeNSFW(evt) {
+      return evt.category !== "XXX" && evt.category !== "xxx"; // REMOVE ALL NSFW
+    }
+    var filtered = res.response.filter(removeNSFW);
+    filtered = filtered.filter(cb.bind(this));
+    return Promise.resolve(filtered);
+  })
+  .catch(e => {
+    return Promise.reject("Error");
+  })
+}
+
 window.addEventListener("load", function() {
 
   const state = new KaiState({});
@@ -107,6 +160,27 @@ window.addEventListener("load", function() {
             window['video'].play();
             this.$router.hideLoading();
           })
+          hls.on(Hls.Events.MANIFEST_PARSED, function(event, data) {
+            console.log('manifest loaded, found ' + data.levels.length + ' quality level');
+          });
+          hls.on(Hls.Events.ERROR, function (event, data) {
+            if (data.fatal) {
+              switch (data.type) {
+                case Hls.ErrorTypes.NETWORK_ERROR:
+                  console.log('fatal network error encountered, try to recover');
+                  hls.startLoad();
+                  break;
+                case Hls.ErrorTypes.MEDIA_ERROR:
+                  console.log('fatal media error encountered, try to recover');
+                  hls.recoverMediaError();
+                  break;
+                default:
+                  $router.showToast("ERROR");
+                  hls.destroy();
+                  break;
+              }
+            }
+          });
           window['hls'] = hls;
           window['video'] = video;
         },
@@ -172,22 +246,25 @@ window.addEventListener("load", function() {
 
   }
 
-  const browseChannel = function($router, item) {
+  const browseChannel = function($router, item, cb) {
     $router.showLoading();
-    xhr('GET', item.url)
-    .then((data) => {
+    downloadChannel(item.name, cb)
+    .then((res) => {
       var channels = [];
-      var d = M3U.parse(data.response);
-      for (var x in d) {
-        if (d[x]) {
-          const meta = parse(d[x].title);
-          channels.push({
-            name: meta['tvg-name'],
-            country: meta['tvg-country'],
-            lang: meta['tvg-language'],
-            desc: meta['group-title'],
-            url: d[x].file,
-          });
+      for (var i in res) {
+        const c = res[i];
+        if (c) {
+          var countries = [];
+          for (var j in c.countries) {
+            countries.push(c.countries[j].name);
+          }
+          var langs = [];
+          for (var k in c.languages) {
+            langs.push(c.languages[k].name);
+          }
+          c.country = countries.join(', ');
+          c.lang = langs.join(', ');
+          channels.push(c);
         }
       }
       $router.push(
@@ -231,6 +308,7 @@ window.addEventListener("load", function() {
       );
     })
     .catch((err) => {
+      $router.showToast(err.toString());
       console.log(err);
     })
     .finally(() => {
@@ -240,17 +318,21 @@ window.addEventListener("load", function() {
 
   const browseCategory = function($router, name) {
     var LINKS = [];
+    var cb;
     if (name === 'By Category') {
       for (var x in CATEGORY) {
         LINKS.push({ name: x, url: CATEGORY[x] });
+        cb = filterCategory;
       }
     } else if (name === 'By Country') {
       for (var x in COUNTRY) {
         LINKS.push({ name: x, url: COUNTRY[x] });
+        cb = filterCountries;
       }
     } else if (name === 'By Language') {
       for (var x in LANGUAGE) {
         LINKS.push({ name: x, url: LANGUAGE[x] });
+        cb = filterLanguages;
       }
     }
     $router.push(
@@ -270,7 +352,7 @@ window.addEventListener("load", function() {
         },
         methods: {
           selected: function(item) {
-            browseChannel($router, item);
+            browseChannel($router, item, cb);
           },
           renderSoftKeyLCR: function() {
             if (this.$router.bottomSheet) {
@@ -531,3 +613,13 @@ window.addEventListener("load", function() {
   });
 
 });
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js')
+  .then(function(swReg) {
+    console.error('Service Worker Registered');
+  })
+  .catch(function(error) {
+    console.error('Service Worker Error', error);
+  });
+}
