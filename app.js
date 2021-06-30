@@ -37,6 +37,60 @@ var xhr = function(method, url, data={}, query={}, headers={}) {
   });
 }
 
+const SDCARD = navigator.getDeviceStorage('sdcard');
+
+function saveToDisk(blob, name, cb = () => {}) {
+  var path = name.split('/');
+  var name = path.pop();
+  if (SDCARD.storageName !== '') {
+    path = `/${SDCARD.storageName}/${path.join('/')}/${name}`;
+  } else {
+    path = `${path.join('/')}/${name}`;
+  }
+  const addFile = SDCARD.addNamed(blob, path);
+  addFile.onsuccess = (evt) => {
+    cb(path);
+  }
+  addFile.onerror = (err) => {
+    cb(false);
+  }
+}
+
+function getFromNetwork(path, resolve, reject) {
+  xhr('GET', BASE_URL + '/' + path)
+  .then((data) => {
+    const blob = new Blob([data.response.toString()], {type : 'audio/x-mpegurl'});
+    saveToDisk(blob, path);
+    resolve(data.response);
+  })
+  .catch((err) => {
+    reject(err);
+  });
+}
+
+function getFromDisk(path) {
+  const _path = path;
+  return new Promise((resolve, reject) => {
+    if (SDCARD.storageName !== '') {
+      path = `/${SDCARD.storageName}/${path}`;
+    }
+    var request = SDCARD.get(path);
+    request.onsuccess = function () {
+      var reader = new FileReader();
+      reader.onload = function() {
+        resolve(reader.result);
+      };
+      reader.onerror = function(){
+        getFromNetwork(_path, resolve, reject);
+      };
+      reader.readAsText(this.result);
+    }
+    request.onerror = function () {
+      getFromNetwork(_path, resolve, reject);
+    }
+  });
+}
+
 if (!String.prototype.replaceAll) {
   String.prototype.replaceAll = function(str, newStr){
     // If a regex pattern
@@ -174,10 +228,10 @@ window.addEventListener("load", function() {
 
   const browseChannel = function($router, item) {
     $router.showLoading();
-    xhr('GET', item.url)
-    .then((data) => {
+    getFromDisk(item.url)
+    .then((response) => {
       var channels = [];
-      var d = M3U.parse(data.response);
+      var d = M3U.parse(response);
       for (var x in d) {
         if (d[x]) {
           const meta = parse(d[x].title);
@@ -231,6 +285,7 @@ window.addEventListener("load", function() {
       );
     })
     .catch((err) => {
+      $router.showToast("Error, Try Again");
       console.log(err);
     })
     .finally(() => {

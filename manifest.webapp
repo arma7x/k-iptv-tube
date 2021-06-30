@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.0.1",
   "name": "IPTV Tube",
   "description": "Watch free iptv channels from around the world on KaiOS for free",
   "launch_path": "/index.html",
@@ -22,6 +22,9 @@
   "permissions": {
     "systemXHR": {
       "description": "Required to load remote content"
+    },
+    "device-storage:sdcard":{
+      "access": "readwrite"
     }
   },
   "locales": {
