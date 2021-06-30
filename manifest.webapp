@@ -1,5 +1,5 @@
 {
-  "version": "1.0.1",
+  "version": "1.1.0",
   "name": "IPTV Tube",
   "description": "Watch free iptv channels from around the world on KaiOS for free",
   "launch_path": "/index.html",
@@ -24,7 +24,14 @@
       "description": "Required to load remote content"
     },
     "device-storage:sdcard":{
-      "access": "readwrite"
+      "access": "readwrite",
+      "description": "Cache m3u file to local storage"
+    },
+    "mobiledata": {
+      "description": "China Type Approval (CTA)"
+    },
+    "wifidata": {
+      "description": "China Type Approval (CTA)"
     }
   },
   "locales": {

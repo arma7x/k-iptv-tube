@@ -80,7 +80,7 @@ function getFromDisk(path) {
       reader.onload = function() {
         resolve(reader.result);
       };
-      reader.onerror = function(){
+      reader.onerror = function() {
         getFromNetwork(_path, resolve, reject);
       };
       reader.readAsText(this.result);
@@ -228,6 +228,7 @@ window.addEventListener("load", function() {
 
   const browseChannel = function($router, item) {
     $router.showLoading();
+    console.log(item.url);
     getFromDisk(item.url)
     .then((response) => {
       var channels = [];
