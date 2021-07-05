@@ -120,9 +120,28 @@ function parse(a) {
   return metadata;
 }
 
+const generateID = function(url) {
+  const hashids2 = new Hashids(url, 15);
+  return hashids2.encode(1);
+}
+
+const APP_VERSION = '1.2.0';
+
+localforage.setDriver(localforage.LOCALSTORAGE);
+
 window.addEventListener("load", function() {
 
-  const state = new KaiState({});
+  const state = new KaiState({
+    BOOKMARKS: {}
+  });
+
+  localforage.getItem('BOOKMARKS')
+  .then((BOOKMARKS) => {
+    if (BOOKMARKS == null) {
+      BOOKMARKS = {};
+    }
+    state.setState('BOOKMARKS', BOOKMARKS);
+  });
 
   const playVideo = function($router, meta) {
     $router.push(
@@ -245,6 +264,36 @@ window.addEventListener("load", function() {
 
   }
 
+  const addRemoveFavourite = function($router, meta) {
+    return new Promise((resolve, reject) => {
+      localforage.getItem('BOOKMARKS')
+      .then((BOOKMARKS) => {
+        if (BOOKMARKS == null) {
+          BOOKMARKS = {};
+        }
+        if (BOOKMARKS[meta.id] == null) {
+          BOOKMARKS[meta.id] = meta;
+          $router.showToast("Bookmarked");
+        } else {
+          delete BOOKMARKS[meta.id];
+          $router.showToast("Removed");
+        }
+        return localforage.setItem('BOOKMARKS', BOOKMARKS)
+        .then(() => {
+          return localforage.getItem('BOOKMARKS');
+        });
+      })
+      .then((UPDATE) => {
+        state.setState('BOOKMARKS', UPDATE);
+        resolve(UPDATE);
+      })
+      .catch((e) => {
+        reject(e);
+        $router.showToast("Error");
+      });
+    });
+  }
+
   const browseChannel = function($router, item) {
     $router.showLoading();
     console.log(item.url);
@@ -261,6 +310,7 @@ window.addEventListener("load", function() {
             lang: meta['tvg-language'],
             desc: meta['group-title'],
             url: d[x].file,
+            id: generateID(d[x].file)
           });
         }
       }
@@ -275,11 +325,28 @@ window.addEventListener("load", function() {
           templateUrl: document.location.origin + '/templates/channels.html',
           mounted: function() {
             this.$router.setHeaderTitle(item.name);
+            this.methods.renderSKRight();
           },
           unmounted: function() {},
           methods: {
             selected: function(meta) {
               playVideo($router, meta);
+            },
+            renderSKRight: function() {
+              if (this.$router.bottomSheet) {
+                return
+              }
+              this.$router.setSoftKeyRightText('');
+              if (this.verticalNavIndex > -1) {
+                const selected = this.data.channels[this.verticalNavIndex];
+                if (selected) {
+                  if (state.getState('BOOKMARKS')[selected.id]) {
+                    this.$router.setSoftKeyRightText('Remove');
+                  } else {
+                    this.$router.setSoftKeyRightText('Bookmark');
+                  }
+                }
+              }
             }
           },
           softKeyText: { left: '', center: 'SELECT', right: '' },
@@ -291,14 +358,24 @@ window.addEventListener("load", function() {
                 this.methods.selected(selected);
               }
             },
-            right: function() {}
+            right: function() {
+              const selected = this.data.channels[this.verticalNavIndex];
+              if (selected) {
+                addRemoveFavourite($router, selected)
+                .finally(() => {
+                  this.methods.renderSKRight();
+                });
+              }
+            }
           },
           dPadNavListener: {
             arrowUp: function() {
               this.navigateListNav(-1);
+              this.methods.renderSKRight();
             },
             arrowDown: function() {
               this.navigateListNav(1);
+              this.methods.renderSKRight();
             }
           }
         })
@@ -311,6 +388,81 @@ window.addEventListener("load", function() {
     .finally(() => {
       $router.hideLoading();
     })
+  }
+
+  const browseBookmark = function($router, channels) {
+    $router.push(
+      new Kai({
+        name: 'channel',
+        data: {
+          title: '_channel_',
+          channels: channels,
+        },
+        verticalNavClass: '.channelNav',
+        templateUrl: document.location.origin + '/templates/channels.html',
+        mounted: function() {
+          this.$router.setHeaderTitle('Bookmarks');
+          this.methods.renderSKRight();
+        },
+        unmounted: function() {},
+        methods: {
+          selected: function(meta) {
+            playVideo($router, meta);
+          },
+          renderSKRight: function() {
+            if (this.$router.bottomSheet) {
+              return
+            }
+            this.$router.setSoftKeyText('', '', '');
+            if (this.verticalNavIndex > -1) {
+              const selected = this.data.channels[this.verticalNavIndex];
+              if (selected) {
+                if (state.getState('BOOKMARKS')[selected.id]) {
+                  this.$router.setSoftKeyText(' ', 'SELECT', 'Remove');
+                }
+              }
+            }
+          }
+        },
+        softKeyText: { left: '', center: '', right: '' },
+        softKeyListener: {
+          left: function() {},
+          center: function() {
+            const selected = this.data.channels[this.verticalNavIndex];
+            if (selected) {
+              this.methods.selected(selected);
+            }
+          },
+          right: function() {
+            const selected = this.data.channels[this.verticalNavIndex];
+            if (selected) {
+              addRemoveFavourite($router, selected)
+              .finally(() => {
+                var updated = [];
+                var bookmarks = state.getState('BOOKMARKS');
+                for (var x in bookmarks) {
+                  updated.push(bookmarks[x]);
+                }
+                if (this.verticalNavIndex > updated.length - 1)
+                  this.verticalNavIndex -= 1
+                this.setData({ channels: updated });
+                this.methods.renderSKRight();
+              });
+            }
+          }
+        },
+        dPadNavListener: {
+          arrowUp: function() {
+            this.navigateListNav(-1);
+            this.methods.renderSKRight();
+          },
+          arrowDown: function() {
+            this.navigateListNav(1);
+            this.methods.renderSKRight();
+          }
+        }
+      })
+    );
   }
 
   const browseCategory = function($router, name) {
@@ -490,6 +642,13 @@ window.addEventListener("load", function() {
     templateUrl: document.location.origin + '/templates/home.html',
     mounted: function() {
       this.$router.setHeaderTitle('Browse IPTV');
+      localforage.getItem('APP_VERSION')
+      .then((v) => {
+        if (v == null || v != APP_VERSION) {
+          this.$router.showDialog('Notice', `Bookmark your favourite channel & Goto <b>Menu > Bookmarks</b> to access your bookmarks`, null, ' ', () => {}, 'Close', () => {}, ' ', null, () => {});
+        }
+        localforage.setItem('APP_VERSION', APP_VERSION)
+      });
     },
     unmounted: function() {
     },
@@ -498,10 +657,25 @@ window.addEventListener("load", function() {
         browseCategory(this.$router, item.name);
       },
     },
-    softKeyText: { left: 'Help', center: 'SELECT', right: 'Exit' },
+    softKeyText: { left: 'Menu', center: 'SELECT', right: 'Exit' },
     softKeyListener: {
       left: function() {
-        this.$router.push('helpSupportPage');
+        var menus = [
+          { "text": "Help" },
+          { "text": "Bookmarks" }
+        ];
+        this.$router.showOptionMenu('Menu', menus, 'Select', (selected) => {
+          if (selected.text === 'Help') {
+            this.$router.push('helpSupportPage');
+          } else if (selected.text === 'Bookmarks') {
+            var channels = [];
+            var bookmarks = this.$state.getState('BOOKMARKS');
+            for (var x in bookmarks) {
+              channels.push(bookmarks[x]);
+            }
+            browseBookmark(this.$router, channels);
+          }
+        });
       },
       center: function() {
         const selected = this.data.list[this.verticalNavIndex];
