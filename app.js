@@ -125,7 +125,7 @@ const generateID = function(url) {
   return hashids2.encode(1);
 }
 
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 
 localforage.setDriver(localforage.LOCALSTORAGE);
 
@@ -218,12 +218,17 @@ window.addEventListener("load", function() {
               document.getElementById('vplayer').width = 320;
               document.getElementById('vplayer').clientHeight = (320 / this.data.ratio);
               this.$router.setSoftKeyLeftText('Exit Fullscreen');
+              document.getElementById('__kai_soft_key__').style.display = 'none';
+              $router.showToast('Click Back/EndCall to exit fullscreen');
+              document.getElementById('vplayer').style.marginTop = '20px';
             } else {
               screen.orientation.unlock();
               document.exitFullscreen();
               document.getElementById('vplayer').width = this.data.width;
               document.getElementById('vplayer').clientHeight = this.data.height;
               this.$router.setSoftKeyLeftText('Fullscreen');
+              document.getElementById('__kai_soft_key__').style.display = '';
+              document.getElementById('vplayer').style.marginTop = '0px';
             }
           },
           center: function() {},
@@ -254,6 +259,8 @@ window.addEventListener("load", function() {
             document.getElementById('vplayer').width = this.data.width;
             document.getElementById('vplayer').clientHeight = this.data.height;
             this.$router.setSoftKeyLeftText('Fullscreen');
+            document.getElementById('__kai_soft_key__').style.display = '';
+            document.getElementById('vplayer').style.marginTop = '0px';
             return true;
           } else {
             return false;
@@ -628,6 +635,97 @@ window.addEventListener("load", function() {
     }
   });
 
+  const localFiles = new Kai({
+    name: 'localFiles',
+    data: {
+      title: 'localFiles',
+      files: []
+    },
+    verticalNavClass: '.fileNav',
+    templateUrl: document.location.origin + '/templates/localFiles.html',
+    mounted: function() {
+      navigator.spatialNavigationEnabled = false;
+      this.$router.setHeaderTitle('Local M3U8');
+      localforage.getItem('LOCAL_FILES')
+      .then((files) => {
+        if (!files) {
+          window['__DS__'] = new DataStorage(this.methods.onChange, this.methods.onReady);
+        } else {
+          this.setData({files: files});
+        }
+      });
+    },
+    unmounted: function() {
+      if (window['__DS__']) {
+        window['__DS__'].destroy();
+      }
+    },
+    methods: {
+      selected: function() {},
+      onChange: function(fileRegistry, documentTree, groups) {
+        this.methods.runFilter(groups['iptv'] || {});
+      },
+      onReady: function(status) {
+        if (status) {
+          this.$router.hideLoading();
+        } else {
+          this.$router.showLoading(false);
+        }
+      },
+      runFilter: function(fileRegistry) {
+        var files = []
+        fileRegistry.forEach((file) => {
+          var n = file.split('/');
+          var n1 = n[n.length - 1];
+          var n2 = n1.split('.');
+          if (n2.length > 1) {
+            files.push({'name': n1, 'path': file});
+          }
+        });
+        this.setData({files: files});
+        localforage.setItem('LOCAL_FILES', files);
+      }
+    },
+    softKeyText: { left: 'Refresh', center: 'SELECT', right: '' },
+    softKeyListener: {
+      left: function() {
+        window['__DS__'] = new DataStorage(this.methods.onChange, this.methods.onReady);
+      },
+      center: function() {
+        var file = this.data.files[this.verticalNavIndex];
+        if (file) {
+          if (window['__DS__'] == null)
+            window['__DS__'] = new DataStorage();
+          window['__DS__'].__getFile__(file.path, (result) => {
+            var reader = new FileReader();
+            reader.onload = (event) => {
+              playVideo(this.$router, { name: file.name, url: event.target.result.trim() });
+            };
+            reader.readAsText(result);
+          }, (err) => {
+            console.log(err);
+          });
+        }
+      },
+      right: function() {}
+    },
+    dPadNavListener: {
+      arrowUp: function() {
+        this.navigateListNav(-1);
+      },
+      arrowRight: function() {
+        //this.navigateTabNav(-1);
+      },
+      arrowDown: function() {
+        this.navigateListNav(1);
+      },
+      arrowLeft: function() {
+        //this.navigateTabNav(1);
+      },
+    },
+    backKeyListener: function() {}
+  });
+
   const home = new Kai({
     name: 'home',
     data: {
@@ -645,7 +743,7 @@ window.addEventListener("load", function() {
       localforage.getItem('APP_VERSION')
       .then((v) => {
         if (v == null || v != APP_VERSION) {
-          this.$router.showDialog('Notice', `Bookmark your favourite channel & Goto <b>Menu > Bookmarks</b> to access your bookmarks`, null, ' ', () => {}, 'Close', () => {}, ' ', null, () => {});
+          this.$router.showDialog(`Version ${APP_VERSION}`, `Add support for local m3u8 file.<br>Goto <b>Menu > Help</b>, scroll to point 6.`, null, ' ', () => {}, 'Close', () => {}, ' ', null, () => {});
         }
         localforage.setItem('APP_VERSION', APP_VERSION)
       });
@@ -662,7 +760,8 @@ window.addEventListener("load", function() {
       left: function() {
         var menus = [
           { "text": "Help" },
-          { "text": "Bookmarks" }
+          { "text": "Bookmarks" },
+          { "text": "Local M3U8" }
         ];
         this.$router.showOptionMenu('Menu', menus, 'Select', (selected) => {
           if (selected.text === 'Help') {
@@ -674,6 +773,8 @@ window.addEventListener("load", function() {
               channels.push(bookmarks[x]);
             }
             browseBookmark(this.$router, channels);
+          } else if (selected.text == 'Local M3U8') {
+            this.$router.push('localFiles');
           }
         });
       },
@@ -718,6 +819,10 @@ window.addEventListener("load", function() {
       'index' : {
         name: 'home',
         component: home
+      },
+      'localFiles' : {
+        name: 'localFiles',
+        component: localFiles
       },
       'helpSupportPage': {
         name: 'helpSupportPage',
