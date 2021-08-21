@@ -758,6 +758,46 @@ window.addEventListener("load", function() {
       selected: function(item) {
         browseCategory(this.$router, item.name);
       },
+      clearCaches: function(types) {
+        console.log(types);
+        const DS = new DataStorage(()=>{}, (status) => {
+          if (status) {
+            if (DS.fileRegistry) {
+              const caches = [];
+              DS.fileRegistry.forEach((path) => {
+                types.forEach((type) => {
+                  if (path.indexOf('iptv') > -1 && path.indexOf(type) > -1 && path.indexOf('m3u') > -1) {
+                    if (path[0] === '/') {
+                      path = path.substring(1, path.length);
+                    }
+                    caches.push(path);
+                  }
+                });
+              });
+              if (caches.length > 0) {
+                this.$router.showLoading();
+                var done = 0;
+                caches.forEach((path) => {
+                  const paths = path.split('/');
+                  const name = paths.pop();
+                  console.log(paths, name);
+                  DS.deleteFile(paths, name)
+                  .finally(() => {
+                    done += 1;
+                    if (caches.length >= done) {
+                      this.$router.showToast("DONE");
+                      this.$router.hideLoading();
+                      DS.destroy();
+                    }
+                  });
+                });
+              } else {
+                DS.destroy();
+              }
+            }
+          }
+        });
+      }
     },
     softKeyText: { left: 'Menu', center: 'SELECT', right: 'Exit' },
     softKeyListener: {
@@ -781,41 +821,22 @@ window.addEventListener("load", function() {
           } else if (selected.text == 'Local M3U8') {
             this.$router.push('localFiles');
           } else if (selected.text == 'Clear Local Caches') {
-            const DS = new DataStorage(()=>{}, (status) => {
-              if (status) {
-                if (DS.fileRegistry) {
-                  const caches = [];
-                  DS.fileRegistry.forEach((path) => {
-                    if (path.indexOf('iptv') > -1 && path.indexOf('m3u') > -1) {
-                      if (path[0] === '/') {
-                        path = path.substring(1, path.length);
-                      }
-                      caches.push(path);
-                    }
-                  });
-                  if (caches.length > 0) {
-                    this.$router.showLoading();
-                    var done = 0;
-                    caches.forEach((path) => {
-                      const paths = path.split('/');
-                      const name = paths.pop();
-                      console.log(paths, name);
-                      DS.deleteFile(paths, name)
-                      .finally(() => {
-                        done += 1;
-                        if (caches.length >= done) {
-                          this.$router.showToast("DONE");
-                          this.$router.hideLoading();
-                          DS.destroy();
-                        }
-                      });
-                    });
-                  } else {
-                    DS.destroy();
-                  }
+            const opts = [
+              { "text": "categories", "checked": false },
+              { "text": "countries", "checked": false },
+              { "text": "languages", "checked": false },
+            ]
+            this.$router.showMultiSelector('Selection', opts, 'Select', null, 'Continue', (options) => {
+              const types = []
+              options.forEach((opt) => {
+                if (opt.checked) {
+                  types.push(opt.text);
                 }
+              });
+              if (types.length > 0) {
+                this.methods.clearCaches(types);
               }
-            });
+            }, 'Cancel', null, undefined, 0);
           }
         });
       },
