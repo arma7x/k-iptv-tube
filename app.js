@@ -125,7 +125,7 @@ const generateID = function(url) {
   return hashids2.encode(1);
 }
 
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 
 localforage.setDriver(localforage.LOCALSTORAGE);
 
@@ -198,6 +198,9 @@ window.addEventListener("load", function() {
                   break;
               }
             }
+          });
+          hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
+            console.log('manifest loaded, found ' + data.levels.length + ' quality level');
           });
           window['hls'] = hls;
           window['video'] = video;
@@ -743,7 +746,8 @@ window.addEventListener("load", function() {
       localforage.getItem('APP_VERSION')
       .then((v) => {
         if (v == null || v != APP_VERSION) {
-          this.$router.showDialog(`Version ${APP_VERSION}`, `Add support for local m3u8 file.<br>Goto <b>Menu > Help</b>, scroll to point 6.`, null, ' ', () => {}, 'Close', () => {}, ' ', null, () => {});
+          this.$router.showToast('Add menu to Clear Local Caches');
+          this.$router.push('helpSupportPage');
         }
         localforage.setItem('APP_VERSION', APP_VERSION)
       });
@@ -761,7 +765,8 @@ window.addEventListener("load", function() {
         var menus = [
           { "text": "Help" },
           { "text": "Bookmarks" },
-          { "text": "Local M3U8" }
+          { "text": "Local M3U8" },
+          { "text": "Clear Local Caches" }
         ];
         this.$router.showOptionMenu('Menu', menus, 'Select', (selected) => {
           if (selected.text === 'Help') {
@@ -775,6 +780,42 @@ window.addEventListener("load", function() {
             browseBookmark(this.$router, channels);
           } else if (selected.text == 'Local M3U8') {
             this.$router.push('localFiles');
+          } else if (selected.text == 'Clear Local Caches') {
+            const DS = new DataStorage(()=>{}, (status) => {
+              if (status) {
+                if (DS.fileRegistry) {
+                  const caches = [];
+                  DS.fileRegistry.forEach((path) => {
+                    if (path.indexOf('iptv') > -1 && path.indexOf('m3u') > -1) {
+                      if (path[0] === '/') {
+                        path = path.substring(1, path.length);
+                      }
+                      caches.push(path);
+                    }
+                  });
+                  if (caches.length > 0) {
+                    this.$router.showLoading();
+                    var done = 0;
+                    caches.forEach((path) => {
+                      const paths = path.split('/');
+                      const name = paths.pop();
+                      console.log(paths, name);
+                      DS.deleteFile(paths, name)
+                      .finally(() => {
+                        done += 1;
+                        if (caches.length >= done) {
+                          this.$router.showToast("DONE");
+                          this.$router.hideLoading();
+                          DS.destroy();
+                        }
+                      });
+                    });
+                  } else {
+                    DS.destroy();
+                  }
+                }
+              }
+            });
           }
         });
       },
@@ -869,9 +910,14 @@ window.addEventListener("load", function() {
       onerror: err => console.error(err),
       onready: ad => {
         ad.call('display')
-        setTimeout(() => {
+        ad.on('close', () => {
+          app.$router.hideBottomSheet();
           document.body.style.position = '';
-        }, 1000);
+        });
+        ad.on('display', () => {
+          app.$router.hideBottomSheet();
+          document.body.style.position = '';
+        });
       }
     })
   }
