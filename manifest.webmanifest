@@ -25,7 +25,7 @@
   ],
   "b2g_features": {
     "version": "3.0.0",
-    "type": "certified",
+    "type": "privileged",
     "core": true,
     "default_locale": "en-US",
     "developer": {
