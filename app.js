@@ -38,7 +38,7 @@ var xhr = function(method, url, data={}, query={}, headers={}) {
   });
 }
 
-const SDCARD = navigator.getDeviceStorage('sdcard');
+const SDCARD = navigator.b2g ? navigator.b2g.getDeviceStorage('sdcard') : navigator.getDeviceStorage('sdcard');
 
 function saveToDisk(blob, name, cb = () => {}) {
   var path = name.split('/');
@@ -125,11 +125,46 @@ const generateID = function(url) {
   return hashids2.encode(1);
 }
 
-const APP_VERSION = '1.4.0';
+const APP_VERSION = '1.5.0';
 
 localforage.setDriver(localforage.LOCALSTORAGE);
 
 window.addEventListener("load", function() {
+
+  function startVolumeManager() {
+    const session = new lib_session.Session();
+    const sessionstate = {};
+    navigator.volumeManager = null;
+    sessionstate.onsessionconnected = function () {
+      // console.log(`AudioVolumeManager onsessionconnected`);
+      lib_audiovolume.AudioVolumeManager.get(session).
+      then((AudioVolumeManagerService) => {
+        // console.log(`Got AudioVolumeManager : #AudioVolumeManagerService.service_id}`);
+        navigator.volumeManager = AudioVolumeManagerService;
+      }).catch((e) => {
+        // console.log(`Error calling AudioVolumeManager service${JSON.stringify(e)}`);
+        navigator.volumeManager = null;
+      });
+    };
+    sessionstate.onsessiondisconnected = function () {
+      startVolumeManager();
+    };
+    session.open('websocket', 'localhost:8081', 'secrettoken', sessionstate, true);
+  }
+
+  (() => {
+    if (navigator.b2g) {
+      const head = document.getElementsByTagName('head')[0];
+      const scripts = ["http://127.0.0.1:8081/api/v1/shared/core.js", "http://127.0.0.1:8081/api/v1/shared/session.js", "http://127.0.0.1:8081/api/v1/audiovolumemanager/service.js"];
+      scripts.forEach((path) => {
+        var script = document.createElement('script');
+        script.type = 'text/javascript';
+        script.src = path;
+        head.appendChild(script);
+      });
+      setTimeout(startVolumeManager, 1000);
+    }
+  })();
 
   const state = new KaiState({
     BOOKMARKS: {}
@@ -155,7 +190,7 @@ window.addEventListener("load", function() {
         },
         templateUrl: document.location.origin + '/templates/player.html',
         mounted: function() {
-          console.log(meta.url);
+          // console.log(meta.url);
           this.$router.setHeaderTitle(meta.name);
           this.$router.showLoading(false);
           var video = document.getElementById('vplayer');
@@ -185,11 +220,11 @@ window.addEventListener("load", function() {
             if (data.fatal) {
               switch (data.type) {
                 case Hls.ErrorTypes.NETWORK_ERROR:
-                  console.log('fatal network error encountered, try to recover');
+                  // console.log('fatal network error encountered, try to recover');
                   hls.startLoad();
                   break;
                 case Hls.ErrorTypes.MEDIA_ERROR:
-                  console.log('fatal media error encountered, try to recover');
+                  // console.log('fatal media error encountered, try to recover');
                   hls.recoverMediaError();
                   break;
                 default:
@@ -239,17 +274,27 @@ window.addEventListener("load", function() {
         },
         dPadNavListener: {
           arrowUp: function() {
-            if (navigator.volumeManager) {
+            if (navigator.b2g) {
+              if (navigator.volumeManager) {
+                navigator.volumeManager.requestVolumeUp();
+                navigator.volumeManager.requestVolumeShow();
+              }
+            } else if (navigator.volumeManager) {
+              navigator.volumeManager.requestUp();
               navigator.volumeManager.requestShow();
-            } else {
             }
           },
           arrowRight: function() {
           },
           arrowDown: function() {
-            if (navigator.volumeManager) {
+            if (navigator.b2g) {
+              if (navigator.volumeManager) {
+                navigator.volumeManager.requestVolumeDown();
+                navigator.volumeManager.requestVolumeShow();
+              }
+            } else if (navigator.volumeManager) {
+              navigator.volumeManager.requestUp();
               navigator.volumeManager.requestShow();
-            } else {
             }
           },
           arrowLeft: function() {
@@ -306,19 +351,28 @@ window.addEventListener("load", function() {
 
   const browseChannel = function($router, item) {
     $router.showLoading();
-    console.log(item.url);
+    // console.log(item.url);
     getFromDisk(item.url)
     .then((response) => {
       var channels = [];
-      var d = M3U.parse(response);
+      var d = M3U.parse(response.replace(/\ url-tvg=".*?\"\s?/g, '\n'));
       for (var x in d) {
         if (d[x]) {
+          var name = 'Unknown';
+          var desc = 'Unknown';
           const meta = parse(d[x].title);
+          if (meta['group-title']) {
+            const splits = meta['group-title'].split(',');
+            if (splits.length > 0) {
+              name = splits.pop();
+            }
+            desc = splits.join(',');
+          }
           channels.push({
-            name: meta['tvg-name'],
-            country: meta['tvg-country'],
-            lang: meta['tvg-language'],
-            desc: meta['group-title'],
+            name: name,
+            country: meta['tvg-country'] || 'Unknown',
+            lang: meta['tvg-language'] || 'Unknown',
+            desc: desc,
             url: d[x].file,
             id: generateID(d[x].file)
           });
@@ -746,7 +800,7 @@ window.addEventListener("load", function() {
       localforage.getItem('APP_VERSION')
       .then((v) => {
         if (v == null || v != APP_VERSION) {
-          this.$router.showToast('Add menu to Clear Local Caches');
+          this.$router.showToast('Updated to new version');
           this.$router.push('helpSupportPage');
         }
         localforage.setItem('APP_VERSION', APP_VERSION)
@@ -759,7 +813,6 @@ window.addEventListener("load", function() {
         browseCategory(this.$router, item.name);
       },
       clearCaches: function(types) {
-        console.log(types);
         const DS = new DataStorage(()=>{}, (status) => {
           if (status) {
             if (DS.fileRegistry) {
@@ -780,7 +833,6 @@ window.addEventListener("load", function() {
                 caches.forEach((path) => {
                   const paths = path.split('/');
                   const name = paths.pop();
-                  console.log(paths, name);
                   DS.deleteFile(paths, name)
                   .finally(() => {
                     done += 1;
