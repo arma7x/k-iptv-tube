@@ -799,6 +799,9 @@ window.addEventListener("load", function() {
       this.$router.setHeaderTitle('Browse IPTV');
       localforage.getItem('APP_VERSION')
       .then((v) => {
+        if (v != null && APP_VERSION > v) {
+          this.methods.clearCaches(['categories', 'countries', 'languages']);
+        }
         if (v == null || v != APP_VERSION) {
           this.$router.showToast('Updated to new version');
           this.$router.push('helpSupportPage');
