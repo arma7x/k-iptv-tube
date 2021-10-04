@@ -262,6 +262,8 @@ window.addEventListener("load", function() {
             } else {
               screen.orientation.unlock();
               document.exitFullscreen();
+              screen.orientation.lock('portrait-primary');
+              screen.orientation.unlock();
               document.getElementById('vplayer').width = this.data.width;
               document.getElementById('vplayer').clientHeight = this.data.height;
               this.$router.setSoftKeyLeftText('Fullscreen');
@@ -304,6 +306,8 @@ window.addEventListener("load", function() {
           if (document.fullscreenElement) {
             screen.orientation.unlock();
             document.exitFullscreen();
+            screen.orientation.lock('portrait-primary');
+            screen.orientation.unlock();
             document.getElementById('vplayer').width = this.data.width;
             document.getElementById('vplayer').clientHeight = this.data.height;
             this.$router.setSoftKeyLeftText('Fullscreen');
@@ -446,7 +450,7 @@ window.addEventListener("load", function() {
       );
     })
     .catch((err) => {
-      $router.showToast("Error, Try Again");
+      $router.showToast("Error, please Clear Local Caches");
       console.log(err);
     })
     .finally(() => {
