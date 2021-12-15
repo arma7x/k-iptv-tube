@@ -749,7 +749,7 @@ window.addEventListener("load", function() {
     methods: {
       selected: function() {},
       onChange: function(fileRegistry, documentTree, groups) {
-        this.methods.runFilter(groups['iptv'] || {});
+        this.methods.runFilter(groups['iptv'] || []);
       },
       onReady: function(status) {
         if (status) {
