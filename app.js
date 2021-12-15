@@ -1,5 +1,5 @@
 var xhr = function(method, url, data={}, query={}, headers={}) {
-  headers['User-Agent'] = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.77 Safari/537.36";
+  //headers['User-Agent'] = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.77 Safari/537.36";
   return new Promise((resolve, reject) => {
     var xhttp = new XMLHttpRequest({ mozSystem: true });
     var _url = new URL(url);
@@ -105,19 +105,41 @@ if (!String.prototype.replaceAll) {
 }
 
 function parse(a) {
-  var metadata = [];
+  var metadata = {};
   const b = a.replaceAll('\"', '');
   const seg = b.split('=');
   for (var i=0;i<seg.length - 1;i++) {
     const n = seg[i].split(' ');
     const n1 = seg[i + 1].split('tvg-');
-    metadata[n[n.length - 1]] = n1[0];
+    metadata[n[n.length - 1]] = n1[0].trim();
   }
   if (metadata['tvg-logo']) {
     const s = metadata['tvg-logo'].split(' ');
-    metadata['tvg-logo'] = s[0];
+    metadata['tvg-logo'] = s[0].trim();
   }
   return metadata;
+}
+
+function fileParser(raw) {
+  const output = [];
+  const lines = raw.split('\n');
+  lines.splice(0, 1);
+  lines.pop();
+  lines.forEach((val, idx) => {
+    if (val.indexOf('#EXTVLCOPT') >- 1) {
+      lines.splice(idx, 1);
+    }
+  });
+  lines.forEach((val, idx) => {
+    if (idx % 2 == 0) {
+      output.push(parse(val));
+    } else {
+      if (output[(idx - 1) / 2]) {
+        output[(idx - 1) / 2].file = val;
+      }
+    }
+  });
+  return output;
 }
 
 const generateID = function(url) {
@@ -125,7 +147,7 @@ const generateID = function(url) {
   return hashids2.encode(1);
 }
 
-const APP_VERSION = '1.5.0';
+const APP_VERSION = '1.6.0';
 
 localforage.setDriver(localforage.LOCALSTORAGE);
 
@@ -359,27 +381,30 @@ window.addEventListener("load", function() {
     getFromDisk(item.url)
     .then((response) => {
       var channels = [];
-      var d = M3U.parse(response.replace(/\ url-tvg=".*?\"\s?/g, '\n'));
-      for (var x in d) {
-        if (d[x]) {
-          var name = 'Unknown';
-          var desc = 'Unknown';
-          const meta = parse(d[x].title);
-          if (meta['group-title']) {
-            const splits = meta['group-title'].split(',');
-            if (splits.length > 0) {
-              name = splits.pop();
+      var parsed = fileParser(response);
+      for (var x in parsed) {
+        if (parsed[x]) {
+          if (Object.keys(parsed[x]).length > 0) {
+            console.log(parsed[x]);
+            var name = 'Unknown';
+            var desc = 'Unknown';
+            const meta = parsed[x];
+            if (meta['group-title']) {
+              const splits = meta['group-title'].split(',');
+              if (splits.length > 0) {
+                name = splits.pop();
+              }
+              desc = splits.join(',');
             }
-            desc = splits.join(',');
+            channels.push({
+              name: name,
+              country: meta['tvg-country'] || 'Unknown',
+              lang: meta['tvg-language'] || 'Unknown',
+              desc: desc,
+              url: parsed[x].file,
+              id: generateID(parsed[x].file)
+            });
           }
-          channels.push({
-            name: name,
-            country: meta['tvg-country'] || 'Unknown',
-            lang: meta['tvg-language'] || 'Unknown',
-            desc: desc,
-            url: d[x].file,
-            id: generateID(d[x].file)
-          });
         }
       }
       $router.push(
