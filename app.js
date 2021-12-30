@@ -124,6 +124,7 @@ function fileParser(raw) {
   const output = [];
   const lines = raw.split('\n');
   lines.splice(0, 1);
+  // console.log(lines[lines.length - 1].length == 0);
   lines.pop();
   lines.forEach((val, idx) => {
     if (val.indexOf('#EXTVLCOPT') >- 1) {
