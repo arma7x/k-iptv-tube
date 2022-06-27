@@ -124,7 +124,6 @@ function fileParser(raw) {
   const output = [];
   const lines = raw.split('\n');
   lines.splice(0, 1);
-  // console.log(lines[lines.length - 1].length == 0);
   lines.pop();
   lines.forEach((val, idx) => {
     if (val.indexOf('#EXTVLCOPT') >- 1) {
@@ -210,6 +209,7 @@ window.addEventListener("load", function() {
           width: 1,
           height: 1,
           ration: 1,
+          recoverMediaError: false,
         },
         templateUrl: document.location.origin + '/templates/player.html',
         mounted: function() {
@@ -239,16 +239,19 @@ window.addEventListener("load", function() {
             window['video'].play();
             this.$router.hideLoading();
           })
-          hls.on(Hls.Events.ERROR, function (event, data) {
+          hls.on(Hls.Events.ERROR, (event, data) => {
             if (data.fatal) {
               switch (data.type) {
                 case Hls.ErrorTypes.NETWORK_ERROR:
-                  // console.log('fatal network error encountered, try to recover');
+                  $router.showToast("NETWORK ERROR, RETRYING");
                   hls.startLoad();
                   break;
                 case Hls.ErrorTypes.MEDIA_ERROR:
-                  // console.log('fatal media error encountered, try to recover');
+                  $router.showToast("MEDIA ERROR, RETRYING");
+                  if (this.data.recoverMediaError)
+                    hls.swapAudioCodec();
                   hls.recoverMediaError();
+                  this.data.recoverMediaError = true;
                   break;
                 default:
                   $router.showToast("ERROR");
@@ -258,7 +261,9 @@ window.addEventListener("load", function() {
             }
           });
           hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
-            console.log('manifest loaded, found ' + data.levels.length + ' quality level');
+            // console.log('manifest loaded, found ' + data.levels.length + ' quality level');
+            // console.log(hls.levels);
+            hls.loadLevel(0);
           });
           window['hls'] = hls;
           window['video'] = video;
@@ -386,7 +391,7 @@ window.addEventListener("load", function() {
       for (var x in parsed) {
         if (parsed[x]) {
           if (Object.keys(parsed[x]).length > 0) {
-            console.log(parsed[x]);
+            // console.log(parsed[x]);
             var name = 'Unknown';
             var desc = 'Unknown';
             const meta = parsed[x];
