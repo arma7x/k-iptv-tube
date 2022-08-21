@@ -147,7 +147,7 @@ const generateID = function(url) {
   return hashids2.encode(1);
 }
 
-const APP_VERSION = '1.6.0';
+const APP_VERSION = '1.7.0';
 
 localforage.setDriver(localforage.LOCALSTORAGE);
 
@@ -737,7 +737,7 @@ window.addEventListener("load", function() {
     templateUrl: document.location.origin + '/templates/localFiles.html',
     mounted: function() {
       navigator.spatialNavigationEnabled = false;
-      this.$router.setHeaderTitle('Local M3U8');
+      this.$router.setHeaderTitle('Local M3U/M3U8');
       localforage.getItem('LOCAL_FILES')
       .then((files) => {
         if (!files) {
@@ -755,7 +755,26 @@ window.addEventListener("load", function() {
     methods: {
       selected: function() {},
       onChange: function(fileRegistry, documentTree, groups) {
-        this.methods.runFilter(groups['iptv'] || []);
+        let m3u = [];
+        if (groups['audio'] != null) {
+          groups['audio'].forEach(p => {
+            let i = p.indexOf('.m3u');
+            if (i > -1 && p[i + 4] == null) {
+              m3u.push(p);
+            }
+          });
+        }
+        if (groups['m3u'] != null) {
+          groups['m3u'].forEach(p => {
+            m3u.push(p);
+          });
+        }
+        if (groups['iptv'] != null) {
+          groups['iptv'].forEach(p => {
+            m3u.push(p);
+          });
+        }
+        this.methods.runFilter(m3u);
       },
       onReady: function(status) {
         if (status) {
@@ -786,17 +805,24 @@ window.addEventListener("load", function() {
       center: function() {
         var file = this.data.files[this.verticalNavIndex];
         if (file) {
-          if (window['__DS__'] == null)
-            window['__DS__'] = new DataStorage();
-          window['__DS__'].__getFile__(file.path, (result) => {
-            var reader = new FileReader();
-            reader.onload = (event) => {
-              playVideo(this.$router, { name: file.name, url: event.target.result.trim() });
-            };
-            reader.readAsText(result);
-          }, (err) => {
-            console.log(err);
-          });
+          const parts = file.path.split('.');
+          const ext = parts[parts.length - 1];
+          if (ext === 'm3u') {
+            const fn = file.path.split('/');
+            browseChannel(this.$router, { url: file.path, name: fn[fn.length - 1] });
+          } else if (ext === 'iptv') {
+            if (window['__DS__'] == null)
+              window['__DS__'] = new DataStorage();
+            window['__DS__'].__getFile__(file.path, (result) => {
+              var reader = new FileReader();
+              reader.onload = (event) => {
+                playVideo(this.$router, { name: file.name, url: event.target.result.trim() });
+              };
+              reader.readAsText(result);
+            }, (err) => {
+              console.log(err);
+            });
+          }
         }
       },
       right: function() {}
@@ -895,7 +921,7 @@ window.addEventListener("load", function() {
         var menus = [
           { "text": "Help" },
           { "text": "Bookmarks" },
-          { "text": "Local M3U8" },
+          { "text": "Local M3U/M3U8" },
           { "text": "Clear Local Caches" }
         ];
         this.$router.showOptionMenu('Menu', menus, 'Select', (selected) => {
@@ -908,7 +934,7 @@ window.addEventListener("load", function() {
               channels.push(bookmarks[x]);
             }
             browseBookmark(this.$router, channels);
-          } else if (selected.text == 'Local M3U8') {
+          } else if (selected.text == 'Local M3U/M3U8') {
             this.$router.push('localFiles');
           } else if (selected.text == 'Clear Local Caches') {
             const opts = [
