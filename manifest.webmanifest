@@ -24,7 +24,7 @@
     }
   ],
   "b2g_features": {
-    "version": "3.3.1",
+    "version": "3.3.2",
     "type": "privileged",
     "core": true,
     "default_locale": "en-US",
@@ -32,7 +32,6 @@
       "name": "arma7x",
       "url": "https://www.kaiostech.com"
     },
-    "origin": "iptv",
     "permissions": {
       "systemXHR": {
         "description": "Required to load remote content"
